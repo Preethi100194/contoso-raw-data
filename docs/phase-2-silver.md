@@ -34,17 +34,42 @@ speed up the queries that Gold and Power BI will run against them.
 
 ---
 
-## Design decisions and trade-offs
+### Delta Time Travel — hands-on verification
 
-| Decision | Choice | Why |
-|---|---|---|
-| Silver storage | Separate Lakehouse `lh_silver` in same workspace | Physical layer separation gives independent security, lifecycle, and optimization. Single-workspace avoids operational overhead of cross-workspace permissions on a solo project. |
-| Engine | PySpark notebook (not Dataflow Gen2) | Silver needs explicit schema control, precise null semantics, and window-function-based dedup at scale. Dataflow Gen2 is right for Gold's analyst-facing business logic, not Silver's engineering transforms. |
-| Key widening | Cast integer surrogate keys to `LongType` (bigint) | Future-proofs dimensions against `int` overflow (2.1B cap). Silver is the contract layer — Gold trusts its types. |
-| Null handling | `coalesce(col, 'UNKNOWN')` on analytical columns | Downstream joins and groupings break on nulls. Replacing with an explicit sentinel value makes reports reflect "unknown" as a visible category, not missing data. |
-| Dedup strategy | Window function: row_number() with most-recent-first | Works for both single-key and composite-key tables. Preserves the most recent ingestion in case the same record was loaded twice. |
-| Write mode | `overwrite` + `overwriteSchema=true` | Full refresh is fine for a 10K-row project. Production Silver is typically MERGE with watermark columns for incremental updates. |
-| Optimization | `OPTIMIZE` on all tables; `ZORDER BY` on facts only | Every Delta table benefits from compaction. ZORDER has overhead and is only worth it on tables where specific columns are filtered/joined heavily. |
+### Why it matters
+Delta tables track every write as a numbered version in the _delta_log/ folder.
+Until VACUUM removes old Parquet files (default 7-day retention), any version
+can be queried or restored. This replaces the need for manual backups for
+near-term recovery — an engineer who accidentally truncates a table on Friday
+can restore it Monday without opening a support ticket.
+
+### What I ran
+```python
+spark.sql("DESCRIBE HISTORY silver_customer").show()
+spark.sql("SELECT COUNT(*) FROM silver_customer VERSION AS OF 0")
+spark.sql("SELECT COUNT(*) FROM silver_customer")
+```
+
+### What it proved
+- `DESCRIBE HISTORY` returned N versions with timestamps and operation names
+  (CREATE, WRITE, OPTIMIZE), confirming Delta is actively tracking history.
+- Version 0 showed 0 rows (the empty CREATE TABLE step before data load).
+- The current version showed the populated row count.
+- The gap between those two numbers is proof that Time Travel works — the
+  engine can retrieve the table at multiple queryable states.
+
+### What I learned
+`DESCRIBE HISTORY` and `VERSION AS OF` are Spark SQL commands — they run in
+notebooks, not in the T-SQL analytics endpoint. Both engines read the same
+Delta files in OneLake; they just support different dialects. Delta-specific
+maintenance (Time Travel, OPTIMIZE, VACUUM, MERGE) is always Spark SQL.
+
+### Production caveat
+Time Travel's recovery window is bounded by VACUUM retention. A team running
+VACUUM with 1-day retention cannot recover data from 3 days ago — those
+Parquet files are permanently gone. Setting retention is a trade-off between
+storage cost and recovery time, and the decision should be conscious, not
+default.
 
 ---
 
@@ -140,7 +165,7 @@ Surrogate key widening (int → bigint)
 - `screenshots/phase-2-*.png` — verification proofs (row counts, schema,
   dedup, nulls, referential integrity, time travel)
 
-- New Lakehouse lh_silver with 7 cleansed Delta tables
+   - New Lakehouse lh_silver with 7 cleansed Delta tables
    - Snake_case naming, bigint key widening, null handling, dedup
    - OPTIMIZE on all tables, ZORDER on sales and orderrows
    - Hit and documented schema-enabled Lakehouse three-part naming (lh.dbo.table)
