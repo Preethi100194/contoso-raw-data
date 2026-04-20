@@ -65,10 +65,7 @@ speed up the queries that Gold and Power BI will run against them.
 
 ### Screenshots
 
-| | |
-|---|---|
-| ![Row counts](screenshots/phase-2-row-counts.png) | ![Schema](screenshots/phase-2-schema.png) |
-| ![Dedup verified](screenshots/phase-2-dedup-verified.png) | ![Time Travel](screenshots/phase-2-time-travel.png) |
+Refer in the screenshots folder. 
 
 ### Artifacts
 
