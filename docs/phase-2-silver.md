@@ -48,6 +48,34 @@ speed up the queries that Gold and Power BI will run against them.
 
 ---
 
+## ✅ Phase 2 — Silver transformations
+
+**What was built:**
+
+- **Second Lakehouse** `lh_silver` in the same workspace — physical layer
+  separation for independent security, lifecycle, and optimization
+- **PySpark notebook** `nb_silver_from_bronze` with both Lakehouses attached,
+  reading from `lh_bronze.dbo` and writing to `lh_silver` (default)
+- **7 cleansed Silver tables** with snake_case column names, widened `bigint`
+  surrogate keys, null handling, and deduplication on business keys
+- **Delta optimizations applied**: `OPTIMIZE` on all tables, `ZORDER BY` on
+  fact tables for the columns most likely to be filtered in Gold queries
+- **Verified via SQL endpoint**: row counts, schema, zero duplicates,
+  referential integrity holds, Time Travel history accessible
+
+### Screenshots
+
+| | |
+|---|---|
+| ![Row counts](screenshots/phase-2-row-counts.png) | ![Schema](screenshots/phase-2-schema.png) |
+| ![Dedup verified](screenshots/phase-2-dedup-verified.png) | ![Time Travel](screenshots/phase-2-time-travel.png) |
+
+### Artifacts
+
+- `notebooks/silver_from_bronze.ipynb` — exported Spark notebook
+- `docs/phase-2-silver.md` — full writeup with DP-600 concepts and honest
+  lessons learned
+
 concepts this phase covered
 
 Lakehouse schemas (schema-enabled Lakehouse)
@@ -114,3 +142,9 @@ Surrogate key widening (int → bigint)
 - `notebooks/silver_from_bronze.ipynb` — exported Spark notebook
 - `screenshots/phase-2-*.png` — verification proofs (row counts, schema,
   dedup, nulls, referential integrity, time travel)
+
+- New Lakehouse lh_silver with 7 cleansed Delta tables
+   - Snake_case naming, bigint key widening, null handling, dedup
+   - OPTIMIZE on all tables, ZORDER on sales and orderrows
+   - Hit and documented schema-enabled Lakehouse three-part naming (lh.dbo.table)
+   - Hit and documented schema-drift issue (birthday vs birthdate)
