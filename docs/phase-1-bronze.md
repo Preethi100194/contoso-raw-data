@@ -8,6 +8,8 @@ with full audit trail, using a maintainable pipeline pattern.
 
 ## What I built
 
+I built Bronze ingestion using a metadata-driven pipeline with ForEach + dynamic expressions, so adding a new source table is one-line change to the array — not a new activity. I chose HTTP/GitHub hosting for the learning environment but designed the pipeline so swapping to ADLS Gen2 would only change the source connector.
+
 This phase establishes the **Bronze layer** of the medallion architecture — the
 raw, immutable landing zone for source data. The goal isn't transformation; it's
 preservation. Every byte that arrives from the source is kept as-is so that
